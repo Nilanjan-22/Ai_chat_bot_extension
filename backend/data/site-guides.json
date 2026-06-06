@@ -1,0 +1,33 @@
+[
+  {
+    "id": "generic-official-portal",
+    "matches": [
+      "gov.in",
+      "nic.in"
+    ],
+    "allowedDomains": [],
+    "name": "Indian official service portals",
+    "summary": "Use clear, careful guidance and encourage users to verify final requirements on the official portal before submitting any application.",
+    "tips": [
+      "Read the current section heading before moving to the next step.",
+      "Check whether fields marked with a star are mandatory.",
+      "Look for helper text near upload controls for document size and file format."
+    ],
+    "sources": []
+  },
+  {
+    "id": "generic-customer-service-portal",
+    "matches": [
+      "support.",
+      "help."
+    ],
+    "allowedDomains": [],
+    "name": "Customer support and onboarding portals",
+    "summary": "Explain page flow, button meaning, and required steps in simple language without guessing hidden business rules.",
+    "tips": [
+      "Summarize the visible flow before giving next-step guidance.",
+      "Call out validation messages if they are visible on the page."
+    ],
+    "sources": []
+  }
+]
