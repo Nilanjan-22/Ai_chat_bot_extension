@@ -1,6 +1,8 @@
 # Disha
 
-Privacy-first Chrome extension + Node.js backend for read-only website guidance. The assistant reads safe page structure, explains steps, and replies in English, Hindi, or Bengali without filling forms or submitting data.
+**Have you ever got stuck while doing something online?** Whether you're navigating a confusing government portal or filling out a complex form, Disha is here to help. 
+
+Disha is a privacy-first Chrome extension and Node.js backend designed to provide read-only website guidance. The assistant reads safe page structure, explains steps, and replies in English, Hindi, or Bengali—all without ever filling forms or submitting your personal data.
 
 ## What is included
 
