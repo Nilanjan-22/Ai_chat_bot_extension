@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Disha – Grant Microphone Access</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: linear-gradient(135deg, #fffdf7, #f6efe2, #edf4ee);
+        color: #1e293b;
+      }
+      .card {
+        max-width: 420px;
+        width: 90%;
+        background: white;
+        border-radius: 24px;
+        padding: 40px 32px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+        text-align: center;
+      }
+      .icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #14532d, #2a7a58);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px;
+        font-size: 28px;
+      }
+      h1 { font-size: 22px; font-weight: 700; margin-bottom: 12px; }
+      p { font-size: 14px; color: #64748b; line-height: 1.7; margin-bottom: 24px; }
+      #grant-btn {
+        display: inline-block;
+        padding: 12px 32px;
+        border: none;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #172033, #22314f);
+        color: white;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.15s, box-shadow 0.15s;
+      }
+      #grant-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,0.15); }
+      #grant-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+      #status {
+        margin-top: 20px;
+        font-size: 14px;
+        font-weight: 600;
+        min-height: 24px;
+      }
+      .success { color: #16a34a; }
+      .error { color: #dc2626; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="icon">🎤</div>
+      <h1>Microphone Access for Disha</h1>
+      <p>
+        Chrome requires you to grant microphone permission on this page first.
+        After granting, voice input will work in the Disha side panel.
+      </p>
+      <button id="grant-btn">Grant Microphone Access</button>
+      <div id="status"></div>
+    </div>
+    <script src="./mic-permission.js"></script>
+  </body>
+</html>

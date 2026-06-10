@@ -17,6 +17,7 @@ await esbuild.build({
   entryPoints: {
     background: path.join(extensionRoot, "src", "background", "index.js"),
     content: path.join(extensionRoot, "src", "content", "index.js"),
+    voice: path.join(extensionRoot, "src", "voice", "index.js"),
     sidepanel: path.join(extensionRoot, "src", "sidepanel", "main.jsx")
   },
   outdir: outputRoot,
@@ -57,6 +58,10 @@ await copyFile(
 await copyFile(
   path.join(extensionRoot, "sidepanel.html"),
   path.join(outputRoot, "sidepanel.html")
+);
+await copyFile(
+  path.join(extensionRoot, "voice.html"),
+  path.join(outputRoot, "voice.html")
 );
 
 console.log("Extension build complete:", outputRoot);

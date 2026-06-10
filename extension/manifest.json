@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Disha",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Privacy-first, read-only website guidance with English, Hindi, and Bengali support.",
   "minimum_chrome_version": "116",
   "permissions": ["storage", "tabs", "scripting", "sidePanel"],
@@ -17,4 +17,3 @@
     "default_path": "sidepanel.html"
   }
 }
-

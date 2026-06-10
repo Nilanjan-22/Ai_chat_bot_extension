@@ -1,16 +1,32 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 const STORAGE_KEYS = {
   backendUrl: "assistant_backend_url",
   language: "assistant_language",
-  useWebSearch: "assistant_use_web_search"
+  useWebSearch: "assistant_use_web_search",
+  autoSpeak: "assistant_auto_speak"
 };
+
+const SPEECH_LOCALES = {
+  en: "en-IN",
+  hi: "hi-IN",
+  bn: "bn-IN"
+};
+
+const MICROPHONE_SETTINGS_URL = "chrome://settings/content/microphone";
+const BUILD_LABEL = "Build 0.1.1 voice-direct";
 
 const LANGUAGES = [
   { value: "en", label: "English" },
   { value: "hi", label: "हिंदी" },
   { value: "bn", label: "বাংলা" }
 ];
+
+const LANGUAGE_LABELS = {
+  en: "English",
+  hi: "हिंदी",
+  bn: "বাংলা"
+};
 
 const UI = {
   en: {
@@ -41,7 +57,22 @@ const UI = {
     pageSummary: "Page snapshot",
     promptIdeas: "Helpful prompts",
     noWebsite: "No active website",
-    clearChat: "Clear chat"
+    clearChat: "Clear chat",
+    voiceInput: "Voice input",
+    stopListening: "Stop listening",
+    listening: "Listening...",
+    readAloud: "Read aloud",
+    stopAudio: "Stop audio",
+    autoSpeak: "Read replies aloud automatically",
+    autoSpeakHint: "Useful when the assistant is guiding someone through a process step by step.",
+    voiceUnsupported: "Voice input is not supported in this Chrome profile.",
+    speechPlaybackUnsupported: "Audio playback is not supported in this Chrome profile.",
+    microphoneBlocked: "Microphone permission was blocked.",
+    microphoneDisabled: "Chrome denied microphone access for Disha. Open microphone settings, make sure sites can ask, then reload the extension and try again.",
+    microphoneNotFound: "No microphone was found on this device.",
+    openMicSettings: "Open mic settings",
+    noSpeechDetected: "No speech was detected. Please try again.",
+    voiceStartFailed: "Voice input could not start."
   },
   hi: {
     title: "साइट गाइड असिस्टेंट",
@@ -105,8 +136,109 @@ const UI = {
   }
 };
 
+const UI_OVERRIDES = {
+  hi: {
+    title: "दिशा",
+    subtitle: "जटिल फॉर्म और आधिकारिक पोर्टल के लिए केवल मार्गदर्शन।",
+    sync: "पेज जानकारी दोबारा पढ़ें",
+    grant: "इस साइट की अनुमति दें",
+    unsupported: "असिस्टेंट का उपयोग करने के लिए कोई सामान्य वेबसाइट खोलें।",
+    quickExplain: "यह पेज समझाइए",
+    quickNext: "मुझे अगला क्या करना चाहिए?",
+    quickDocs: "यहां कौन से दस्तावेज़ लग सकते हैं?",
+    placeholder: "पूछें कि यह पेज, चेकबॉक्स, फ़ील्ड या चरण किस लिए है...",
+    send: "पूछें",
+    currentSite: "वर्तमान साइट",
+    fields: "दिख रहे फ़ील्ड",
+    settings: "असिस्टेंट सेटिंग्स",
+    privacy: "यह असिस्टेंट केवल दिख रही संरचना पढ़ता है। यह फॉर्म नहीं भरता और डेटा सबमिट नहीं करता।",
+    permissionNote: "पेज पढ़ने से पहले इस साइट की अनुमति दें।",
+    thinking: "सोच रहा है...",
+    askWeb: "आधिकारिक वेब जानकारी उपयोग करें",
+    askWebHint: "इसे चालू करने पर बैकएंड मौजूदा आधिकारिक जानकारी के लिए सीमित वेब सर्च का उपयोग कर सकता है।",
+    assistantReady: "मैं वर्तमान पेज, फ़ील्ड लेबल और अगले चरण केवल मार्गदर्शन के रूप में समझा सकता हूँ।",
+    statusProtected: "केवल मार्गदर्शन",
+    statusGrounded: "वेब-ग्राउंडेड",
+    statusFallback: "फॉलबैक",
+    statusLive: "लाइव मॉडल",
+    sources: "स्रोत",
+    pageSummary: "पेज सारांश",
+    promptIdeas: "उपयोगी प्रश्न",
+    noWebsite: "कोई सक्रिय वेबसाइट नहीं",
+    clearChat: "चैट साफ करें",
+    voiceInput: "आवाज़ से बोलें",
+    stopListening: "सुनना रोकें",
+    listening: "सुन रहा है...",
+    readAloud: "जवाब सुनें",
+    stopAudio: "ऑडियो रोकें",
+    autoSpeak: "जवाब अपने-आप पढ़ें",
+    autoSpeakHint: "जब असिस्टेंट किसी प्रक्रिया में चरण-दर-चरण मदद कर रहा हो तब यह उपयोगी है।",
+    voiceUnsupported: "इस Chrome प्रोफ़ाइल में वॉइस इनपुट समर्थित नहीं है।",
+    speechPlaybackUnsupported: "इस Chrome प्रोफ़ाइल में ऑडियो प्लेबैक समर्थित नहीं है।",
+    microphoneBlocked: "माइक्रोफ़ोन अनुमति अवरुद्ध हो गई।",
+    microphoneDisabled: "Chrome ने Disha के लिए माइक्रोफ़ोन access रोका है। माइक्रोफ़ोन सेटिंग खोलें, sites can ask allow करें, फिर extension reload करके दोबारा कोशिश करें।",
+    microphoneNotFound: "इस डिवाइस पर माइक्रोफ़ोन नहीं मिला।",
+    openMicSettings: "माइक्रोफ़ोन सेटिंग खोलें",
+    noSpeechDetected: "कोई आवाज़ नहीं मिली। कृपया फिर से कोशिश करें।",
+    voiceStartFailed: "वॉइस इनपुट शुरू नहीं हो सका।"
+  },
+  bn: {
+    title: "দিশা",
+    subtitle: "জটিল ফর্ম ও অফিসিয়াল পোর্টালের জন্য শুধু দিকনির্দেশনা।",
+    sync: "পেজ কনটেক্সট আবার নিন",
+    grant: "এই সাইটে অনুমতি দিন",
+    unsupported: "অ্যাসিস্ট্যান্ট ব্যবহার করতে একটি সাধারণ ওয়েবসাইট খুলুন।",
+    quickExplain: "এই পেজটি বুঝিয়ে বলুন",
+    quickNext: "এখন আমার কী করা উচিত?",
+    quickDocs: "এখানে কী কী নথি লাগতে পারে?",
+    placeholder: "জিজ্ঞাসা করুন এই পেজ, চেকবক্স, ফিল্ড বা ধাপটি কী জন্য...",
+    send: "জিজ্ঞাসা করুন",
+    currentSite: "বর্তমান সাইট",
+    fields: "দেখা যাচ্ছে এমন ফিল্ড",
+    settings: "অ্যাসিস্ট্যান্ট সেটিংস",
+    privacy: "এই অ্যাসিস্ট্যান্ট শুধু দৃশ্যমান গঠন পড়ে। এটি ফর্ম পূরণ বা ডাটা সাবমিট করে না।",
+    permissionNote: "পেজ পড়ার আগে এই সাইটে অনুমতি দিন।",
+    thinking: "ভাবছে...",
+    askWeb: "অফিশিয়াল ওয়েব তথ্য ব্যবহার করুন",
+    askWebHint: "এটি চালু থাকলে ব্যাকএন্ড বর্তমান অফিসিয়াল তথ্যের জন্য সীমিত ওয়েব সার্চ ব্যবহার করতে পারে।",
+    assistantReady: "আমি বর্তমান পেজ, ফিল্ড লেবেল এবং পরের ধাপ শুধু নির্দেশনা হিসেবে বুঝিয়ে বলতে পারি।",
+    statusProtected: "শুধু গাইডেন্স",
+    statusGrounded: "ওয়েব-গ্রাউন্ডেড",
+    statusFallback: "ফলব্যাক",
+    statusLive: "লাইভ মডেল",
+    sources: "সূত্র",
+    pageSummary: "পেজ সারাংশ",
+    promptIdeas: "উপকারী প্রশ্ন",
+    noWebsite: "কোনও সক্রিয় ওয়েবসাইট নেই",
+    clearChat: "চ্যাট পরিষ্কার করুন",
+    voiceInput: "ভয়েস ইনপুট",
+    stopListening: "শোনা বন্ধ করুন",
+    listening: "শুনছে...",
+    readAloud: "শুনিয়ে দিন",
+    stopAudio: "অডিও বন্ধ করুন",
+    autoSpeak: "উত্তর নিজে থেকে পড়ে শোনান",
+    autoSpeakHint: "ধাপে ধাপে কাউকে গাইড করার সময় এটি উপকারী।",
+    voiceUnsupported: "এই Chrome প্রোফাইলে ভয়েস ইনপুট সমর্থিত নয়।",
+    speechPlaybackUnsupported: "এই Chrome প্রোফাইলে অডিও প্লেব্যাক সমর্থিত নয়।",
+    microphoneBlocked: "মাইক্রোফোন অনুমতি ব্লক করা হয়েছে।",
+    microphoneDisabled: "Chrome Disha-র জন্য microphone access আটকেছে। Microphone setting খুলুন, sites can ask allow করুন, তারপর extension reload করে আবার চেষ্টা করুন।",
+    microphoneNotFound: "এই ডিভাইসে কোনও মাইক্রোফোন পাওয়া যায়নি।",
+    openMicSettings: "মাইক্রোফোন সেটিং খুলুন",
+    noSpeechDetected: "কোনও কথা ধরা পড়েনি। আবার চেষ্টা করুন।",
+    voiceStartFailed: "ভয়েস ইনপুট শুরু করা যায়নি।"
+  }
+};
+
+function getLocalizedCopy(language) {
+  return {
+    ...UI.en,
+    ...(UI[language] ?? {}),
+    ...(UI_OVERRIDES[language] ?? {})
+  };
+}
+
 function getInitialAssistantMessage(language) {
-  return createAssistantMessage(UI[language]?.assistantReady ?? UI.en.assistantReady, {
+  return createAssistantMessage(getLocalizedCopy(language).assistantReady, {
     mode: "model"
   });
 }
@@ -148,6 +280,61 @@ function extractDomainLabel(urlString) {
   } catch {
     return urlString;
   }
+}
+
+function getSpeechRecognitionConstructor() {
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function getSpeechLocale(language) {
+  return SPEECH_LOCALES[language] || "en-IN";
+}
+
+function stripMarkdownForSpeech(text) {
+  return String(text || "")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\|/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function loadSpeechVoices() {
+  if (!("speechSynthesis" in window)) {
+    return [];
+  }
+
+  return window.speechSynthesis.getVoices();
+}
+
+function pickBestSpeechVoice(voices, language) {
+  const locale = getSpeechLocale(language).toLowerCase();
+  const languageCode = locale.split("-")[0];
+
+  const candidates = voices.filter((voice) =>
+    String(voice.lang || "").toLowerCase().startsWith(languageCode)
+  );
+
+  if (!candidates.length) {
+    return null;
+  }
+
+  const scoreVoice = (voice) => {
+    const voiceLang = String(voice.lang || "").toLowerCase();
+    const voiceName = String(voice.name || "").toLowerCase();
+    let score = 0;
+
+    if (voiceLang === locale) score += 50;
+    if (voiceLang.startsWith(languageCode)) score += 25;
+    if (voiceName.includes("google")) score += 10;
+    if (voiceName.includes("microsoft")) score += 8;
+    if (voice.localService) score += 3;
+
+    return score;
+  };
+
+  return [...candidates].sort((a, b) => scoreVoice(b) - scoreVoice(a))[0];
 }
 
 function parseInlineMarkdown(text) {
@@ -441,59 +628,97 @@ function createUserMessage(text) {
   };
 }
 
-function MessageCard({ message, copy }) {
+function PulseDots() {
+  return (
+    <span className="inline-flex items-center gap-1">
+      {[0, 1, 2].map((dot) => (
+        <span
+          key={dot}
+          className="h-1.5 w-1.5 rounded-full bg-current animate-pulse"
+          style={{ animationDelay: `${dot * 180}ms` }}
+        />
+      ))}
+    </span>
+  );
+}
+
+function MessageCard({ message, copy, onSpeak, speakingMessageId, isIndicLanguage }) {
   if (message.role === "user") {
     return (
-      <article className="ml-10 rounded-[28px] rounded-tr-md bg-ink px-4 py-3 text-white shadow-lg shadow-slate-900/10">
-        <p className="text-sm leading-6 text-white/95">{message.text}</p>
-      </article>
+      <div className="ml-8 flex items-end justify-end gap-3">
+        <article className="max-w-[88%] rounded-[28px] rounded-br-md bg-[linear-gradient(135deg,#172033,#22314f)] px-4 py-3 text-white shadow-lg shadow-slate-900/10">
+          <p className={`text-sm text-white/95 ${isIndicLanguage ? "leading-7 tracking-[0.01em]" : "leading-6"}`}>
+            {message.text}
+          </p>
+        </article>
+        <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-ink text-xs font-semibold text-white shadow-md">
+          You
+        </div>
+      </div>
     );
   }
 
   return (
-    <article className="overflow-hidden rounded-[30px] border border-white/80 bg-white/90 shadow-panel">
-      <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-[linear-gradient(135deg,rgba(245,239,227,0.95),rgba(255,255,255,0.95))] px-4 py-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full bg-ink px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white">
-            {copy.statusProtected}
-          </span>
-          <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
-            {message.webSearchUsed ? copy.statusGrounded : message.mode === "fallback" ? copy.statusFallback : copy.statusLive}
-          </span>
-        </div>
+    <div className="flex items-start gap-3">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#14532d,#2a7a58)] text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-md">
+        AI
       </div>
-      <div className="px-4 py-4">
-        <MessageBody text={message.text} />
-        {message.warning ? (
-          <p className="mt-4 rounded-2xl bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            {message.warning}
-          </p>
-        ) : null}
-        {message.sources?.length ? (
-          <div className="mt-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              {copy.sources}
-            </p>
-            <div className="mt-3 grid gap-2">
-              {message.sources.map((source) => (
-                <a
-                  key={source.url}
-                  href={source.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="group rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 transition hover:border-clay hover:bg-amber-50"
-                >
-                  <p className="text-sm font-medium text-slate-800 group-hover:text-slate-950">
-                    {source.title || extractDomainLabel(source.url)}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">{extractDomainLabel(source.url)}</p>
-                </a>
-              ))}
-            </div>
+      <article className="flex-1 overflow-hidden rounded-[30px] border border-white/80 bg-white/92 shadow-panel">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-[linear-gradient(135deg,rgba(245,239,227,0.95),rgba(255,255,255,0.95))] px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-ink px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white">
+              Disha
+            </span>
+            <span className="rounded-full bg-amber-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-800">
+              {copy.statusProtected}
+            </span>
+            <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+              {message.webSearchUsed ? copy.statusGrounded : message.mode === "fallback" ? copy.statusFallback : copy.statusLive}
+            </span>
           </div>
-        ) : null}
-      </div>
-    </article>
+          <button
+            type="button"
+            onClick={() => onSpeak(message)}
+            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:border-clay hover:text-clay"
+          >
+            {speakingMessageId === message.id ? copy.stopAudio : copy.readAloud}
+          </button>
+        </div>
+        <div className="px-4 py-4">
+          <div className={isIndicLanguage ? "tracking-[0.01em]" : ""}>
+            <MessageBody text={message.text} />
+          </div>
+          {message.warning ? (
+            <p className="mt-4 rounded-2xl bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              {message.warning}
+            </p>
+          ) : null}
+          {message.sources?.length ? (
+            <div className="mt-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                {copy.sources}
+              </p>
+              <div className="mt-3 grid gap-2">
+                {message.sources.map((source) => (
+                  <a
+                    key={source.url}
+                    href={source.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="group rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 transition hover:border-clay hover:bg-amber-50"
+                  >
+                    <p className="text-sm font-medium text-slate-800 group-hover:text-slate-950">
+                      {source.title || extractDomainLabel(source.url)}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">{extractDomainLabel(source.url)}</p>
+                  </a>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </article>
+    </div>
   );
 }
 
@@ -501,6 +726,7 @@ export default function App() {
   const [language, setLanguage] = useState("en");
   const [backendUrl, setBackendUrl] = useState("http://localhost:8787");
   const [useWebSearch, setUseWebSearch] = useState(true);
+  const [autoSpeak, setAutoSpeak] = useState(false);
   const [messageInput, setMessageInput] = useState("");
   const [messages, setMessages] = useState([]);
   const [tab, setTab] = useState(null);
@@ -509,15 +735,27 @@ export default function App() {
   const [loadingContext, setLoadingContext] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [isListening, setIsListening] = useState(false);
+  const [micPermissionBlocked, setMicPermissionBlocked] = useState(false);
+  const [speakingMessageId, setSpeakingMessageId] = useState(null);
+  const [speechVoices, setSpeechVoices] = useState([]);
+  const audioRef = useRef(null);
 
-  const copy = useMemo(() => UI[language] ?? UI.en, [language]);
+  const copy = useMemo(() => getLocalizedCopy(language), [language]);
+  const isIndicLanguage = language === "hi" || language === "bn";
+  const voiceSupported = true;
+  const speechSynthesisSupported = useMemo(
+    () => typeof window !== "undefined" && "speechSynthesis" in window,
+    []
+  );
 
   useEffect(() => {
     (async () => {
       const stored = await getChromeStorage([
         STORAGE_KEYS.backendUrl,
         STORAGE_KEYS.language,
-        STORAGE_KEYS.useWebSearch
+        STORAGE_KEYS.useWebSearch,
+        STORAGE_KEYS.autoSpeak
       ]);
 
       const nextLanguage = stored[STORAGE_KEYS.language] ?? "en";
@@ -526,10 +764,15 @@ export default function App() {
         typeof stored[STORAGE_KEYS.useWebSearch] === "boolean"
           ? stored[STORAGE_KEYS.useWebSearch]
           : true;
+      const nextAutoSpeak =
+        typeof stored[STORAGE_KEYS.autoSpeak] === "boolean"
+          ? stored[STORAGE_KEYS.autoSpeak]
+          : false;
 
       setLanguage(nextLanguage);
       setBackendUrl(nextBackendUrl);
       setUseWebSearch(nextUseWebSearch);
+      setAutoSpeak(nextAutoSpeak);
       setMessages([getInitialAssistantMessage(nextLanguage)]);
       await refreshPageContext();
     })();
@@ -539,9 +782,77 @@ export default function App() {
     setChromeStorage({
       [STORAGE_KEYS.language]: language,
       [STORAGE_KEYS.backendUrl]: backendUrl,
-      [STORAGE_KEYS.useWebSearch]: useWebSearch
+      [STORAGE_KEYS.useWebSearch]: useWebSearch,
+      [STORAGE_KEYS.autoSpeak]: autoSpeak
     });
-  }, [backendUrl, language, useWebSearch]);
+  }, [autoSpeak, backendUrl, language, useWebSearch]);
+
+  useEffect(() => {
+    const handleOffscreenMessage = (message) => {
+      switch (message?.type) {
+        case "VOICE_POPUP_START":
+          setError("");
+          setIsListening(true);
+          break;
+        case "VOICE_POPUP_RESULT":
+          if (message.transcript) {
+            setMessageInput(message.transcript);
+          }
+          break;
+        case "VOICE_POPUP_ERROR":
+          if (message.error === "not-allowed") {
+            setMicPermissionBlocked(true);
+            setError(copy.microphoneDisabled);
+          } else if (message.error === "no-speech") {
+            setError(copy.noSpeechDetected);
+          } else if (message.error === "not-supported") {
+            setError(copy.voiceUnsupported);
+          } else {
+            setError(copy.voiceStartFailed);
+          }
+          setIsListening(false);
+          break;
+        case "VOICE_POPUP_END":
+          setIsListening(false);
+          break;
+        default:
+          break;
+      }
+    };
+
+    chrome.runtime.onMessage.addListener(handleOffscreenMessage);
+
+    return () => {
+      chrome.runtime.onMessage.removeListener(handleOffscreenMessage);
+
+      sendRuntimeMessage({ type: "STOP_VOICE_RECOGNITION" }).catch(() => {});
+
+      if (speechSynthesisSupported) {
+        window.speechSynthesis.cancel();
+      }
+
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    };
+  }, [speechSynthesisSupported, copy]);
+
+  useEffect(() => {
+    if (!speechSynthesisSupported) {
+      return;
+    }
+
+    const refreshVoices = () => {
+      setSpeechVoices(loadSpeechVoices());
+    };
+
+    refreshVoices();
+    window.speechSynthesis.addEventListener("voiceschanged", refreshVoices);
+
+    return () => {
+      window.speechSynthesis.removeEventListener("voiceschanged", refreshVoices);
+    };
+  }, [speechSynthesisSupported]);
 
   async function refreshPageContext() {
     setLoadingContext(true);
@@ -637,15 +948,23 @@ export default function App() {
       }
 
       const payload = await response.json();
+      const assistantMessage = createAssistantMessage(payload.answer, {
+        sources: payload.sources,
+        warning: payload.warning,
+        webSearchUsed: payload.webSearchUsed,
+        mode: payload.mode
+      });
+
       setMessages([
         ...nextMessages,
-        createAssistantMessage(payload.answer, {
-          sources: payload.sources,
-          warning: payload.warning,
-          webSearchUsed: payload.webSearchUsed,
-          mode: payload.mode
-        })
+        assistantMessage
       ]);
+
+      if (autoSpeak) {
+        window.setTimeout(() => {
+          speakAssistantMessage(assistantMessage);
+        }, 50);
+      }
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unknown request error.");
     } finally {
@@ -653,10 +972,175 @@ export default function App() {
     }
   }
 
+  function stopSpeechPlayback() {
+    if (audioRef.current) {
+      const objectUrl = audioRef.current.dataset.objectUrl;
+      audioRef.current.pause();
+      audioRef.current.removeAttribute("src");
+
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+
+      audioRef.current = null;
+    }
+
+    if (speechSynthesisSupported) {
+      window.speechSynthesis.cancel();
+    }
+
+    setSpeakingMessageId(null);
+  }
+
   function clearChat() {
+    sendRuntimeMessage({ type: "STOP_VOICE_RECOGNITION" }).catch(() => {});
+
+    stopSpeechPlayback();
+
     setMessages([getInitialAssistantMessage(language)]);
     setMessageInput("");
     setError("");
+    setIsListening(false);
+    setMicPermissionBlocked(false);
+  }
+
+  async function playBackendSpeech(message) {
+    const text = stripMarkdownForSpeech(message.text);
+
+    if (!text) {
+      return false;
+    }
+
+    try {
+      const response = await fetch(`${backendUrl}/api/tts`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          text,
+          language
+        })
+      });
+
+      if (!response.ok) {
+        return false;
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const audio = new Audio(objectUrl);
+      audio.dataset.objectUrl = objectUrl;
+
+      audio.onended = () => {
+        URL.revokeObjectURL(objectUrl);
+        if (audioRef.current === audio) {
+          audioRef.current = null;
+        }
+        setSpeakingMessageId(null);
+      };
+
+      audio.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        if (audioRef.current === audio) {
+          audioRef.current = null;
+        }
+        setSpeakingMessageId(null);
+      };
+
+      audioRef.current = audio;
+      setSpeakingMessageId(message.id);
+      setError("");
+      await audio.play();
+      return true;
+    } catch {
+      if (audioRef.current) {
+        const objectUrl = audioRef.current.dataset.objectUrl;
+        audioRef.current.pause();
+        if (objectUrl) {
+          URL.revokeObjectURL(objectUrl);
+        }
+        audioRef.current = null;
+      }
+
+      setSpeakingMessageId(null);
+      return false;
+    }
+  }
+
+  async function speakAssistantMessage(message) {
+    if (speakingMessageId === message.id) {
+      stopSpeechPlayback();
+      return;
+    }
+
+    stopSpeechPlayback();
+
+    if (isIndicLanguage && await playBackendSpeech(message)) {
+      return;
+    }
+
+    if (!speechSynthesisSupported) {
+      setError(copy.speechPlaybackUnsupported);
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(stripMarkdownForSpeech(message.text));
+    const selectedVoice = pickBestSpeechVoice(speechVoices, language);
+
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+      utterance.lang = selectedVoice.lang;
+    } else {
+      utterance.lang = getSpeechLocale(language);
+    }
+
+    utterance.rate = isIndicLanguage ? 0.88 : 0.96;
+    utterance.pitch = 1;
+    utterance.onend = () => setSpeakingMessageId(null);
+    utterance.onerror = () => setSpeakingMessageId(null);
+
+    if (!selectedVoice && isIndicLanguage) {
+      setError("For natural Hindi/Bengali pronunciation, configure backend TTS_API_KEY. Chrome's built-in voice may sound unnatural without an installed Indic voice.");
+    } else {
+      setError("");
+    }
+
+    setSpeakingMessageId(message.id);
+    window.speechSynthesis.speak(utterance);
+  }
+
+  async function toggleVoiceInput() {
+    if (isListening) {
+      sendRuntimeMessage({ type: "STOP_VOICE_RECOGNITION" }).catch(() => {});
+      setIsListening(false);
+      return;
+    }
+
+    setMicPermissionBlocked(false);
+
+    try {
+      const result = await sendRuntimeMessage({
+        type: "START_VOICE_RECOGNITION",
+        language
+      });
+
+      if (result && !result.ok) {
+        setError(result.error || copy.voiceStartFailed);
+      }
+    } catch {
+      setIsListening(false);
+      setError(copy.voiceStartFailed);
+    }
+  }
+
+  async function openMicrophoneSettings() {
+    try {
+      const permissionUrl = chrome.runtime.getURL("mic-permission.html");
+      await chrome.tabs.create({ url: permissionUrl });
+    } catch {
+      setError(`${copy.microphoneDisabled} Open ${MICROPHONE_SETTINGS_URL} manually.`);
+    }
   }
 
   const quickActions = [copy.quickExplain, copy.quickNext, copy.quickDocs];
@@ -666,11 +1150,24 @@ export default function App() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(21,101,192,0.14),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(217,119,6,0.18),_transparent_32%),linear-gradient(180deg,_#fffdf7_0%,_#f6efe2_46%,_#edf4ee_100%)] text-ink">
       <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-4 px-4 py-4 font-body">
         <header className="overflow-hidden rounded-[32px] border border-white/80 bg-white/85 shadow-panel backdrop-blur">
-          <div className="bg-[linear-gradient(135deg,rgba(23,32,51,0.96),rgba(18,74,58,0.94))] px-5 py-5 text-white">
+          <div className="bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.14),transparent_26%),linear-gradient(135deg,rgba(23,32,51,0.98),rgba(18,74,58,0.96))] px-5 py-5 text-white">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="font-display text-[28px] leading-tight">{copy.title}</p>
-                <p className="mt-2 max-w-xl text-sm text-white/80">{copy.subtitle}</p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/90">
+                    AI Guide
+                  </span>
+                  <span className="rounded-full border border-emerald-300/25 bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100">
+                    Voice Ready
+                  </span>
+                  <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/70">
+                    {BUILD_LABEL}
+                  </span>
+                </div>
+                <p className="mt-3 font-display text-[30px] leading-tight">{copy.title}</p>
+                <p className={`mt-2 max-w-xl text-sm text-white/80 ${isIndicLanguage ? "leading-7 tracking-[0.01em]" : ""}`}>
+                  {copy.subtitle}
+                </p>
               </div>
               <select
                 value={language}
@@ -679,7 +1176,7 @@ export default function App() {
               >
                 {LANGUAGES.map((option) => (
                   <option key={option.value} value={option.value} className="text-slate-900">
-                    {option.label}
+                    {LANGUAGE_LABELS[option.value] ?? option.label}
                   </option>
                 ))}
               </select>
@@ -690,7 +1187,7 @@ export default function App() {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-900/70">
                 {copy.statusProtected}
               </p>
-              <p className="mt-2 text-sm leading-6 text-amber-950">{copy.privacy}</p>
+              <p className={`mt-2 text-sm text-amber-950 ${isIndicLanguage ? "leading-7 tracking-[0.01em]" : "leading-6"}`}>{copy.privacy}</p>
             </div>
             <div className="rounded-3xl bg-emerald-50/90 px-4 py-3">
               <label className="flex items-start gap-3">
@@ -702,7 +1199,7 @@ export default function App() {
                 />
                 <span>
                   <span className="block text-sm font-semibold text-emerald-950">{copy.askWeb}</span>
-                  <span className="mt-1 block text-xs leading-5 text-emerald-900/80">
+                  <span className={`mt-1 block text-xs text-emerald-900/80 ${isIndicLanguage ? "leading-6 tracking-[0.01em]" : "leading-5"}`}>
                     {copy.askWebHint}
                   </span>
                 </span>
@@ -717,8 +1214,18 @@ export default function App() {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 {copy.currentSite}
               </p>
-              <p className="mt-1 text-sm font-medium text-slate-800">
-                {currentHost || copy.unsupported}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-800">
+                  {currentHost || copy.unsupported}
+                </span>
+                {!needsPermission && pageContext ? (
+                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                    Ready
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                {pageContext?.title || currentHost || copy.unsupported}
               </p>
             </div>
             <button
@@ -745,7 +1252,7 @@ export default function App() {
 
           {!needsPermission && pageContext ? (
             <div className="mt-4 grid gap-3 md:grid-cols-[1.2fr,0.8fr]">
-              <div className="rounded-[26px] bg-[linear-gradient(135deg,rgba(241,245,249,0.95),rgba(255,255,255,1))] p-4">
+              <div className="rounded-[26px] border border-slate-100 bg-[linear-gradient(135deg,rgba(241,245,249,0.98),rgba(255,255,255,1))] p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                   {copy.pageSummary}
                 </p>
@@ -764,7 +1271,7 @@ export default function App() {
                   <p className="mt-3 text-sm leading-6 text-slate-600">{pageContext.helperText[0]}</p>
                 ) : null}
               </div>
-              <div className="rounded-[26px] bg-[linear-gradient(135deg,rgba(236,253,245,0.92),rgba(255,255,255,1))] p-4">
+              <div className="rounded-[26px] border border-emerald-100 bg-[linear-gradient(135deg,rgba(236,253,245,0.96),rgba(255,255,255,1))] p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                   {copy.promptIdeas}
                 </p>
@@ -786,7 +1293,7 @@ export default function App() {
           ) : null}
 
           {!needsPermission && pageContext?.fields?.length ? (
-            <div className="mt-4 rounded-[26px] bg-slate-50 p-4">
+            <div className="mt-4 rounded-[26px] border border-slate-100 bg-slate-50/90 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 {copy.fields}
               </p>
@@ -807,7 +1314,18 @@ export default function App() {
 
           {loadingContext ? <p className="mt-3 text-sm text-slate-500">{copy.thinking}</p> : null}
           {error ? (
-            <p className="mt-3 rounded-2xl bg-rose-50 px-3 py-2 text-sm text-rose-900">{error}</p>
+            <div className="mt-3 rounded-2xl bg-rose-50 px-3 py-2 text-sm text-rose-900">
+              <p>{error}</p>
+              {micPermissionBlocked ? (
+                <button
+                  type="button"
+                  onClick={openMicrophoneSettings}
+                  className="mt-3 rounded-xl border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-800 transition hover:bg-rose-100"
+                >
+                  {copy.openMicSettings}
+                </button>
+              ) : null}
+            </div>
           ) : null}
         </section>
 
@@ -818,26 +1336,44 @@ export default function App() {
                 Chat
               </p>
               <p className="mt-1 text-sm text-slate-600">
-                Clean, step-by-step guidance with citations when available.
+                Clean, step-by-step guidance with voice support and citations when available.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={clearChat}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700"
-            >
-              {copy.clearChat}
-            </button>
+            <div className="flex items-center gap-2">
+              <label className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 md:flex">
+                <input
+                  type="checkbox"
+                  checked={autoSpeak}
+                  onChange={(event) => setAutoSpeak(event.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600"
+                />
+                <span>{copy.autoSpeak}</span>
+              </label>
+              <button
+                type="button"
+                onClick={clearChat}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700"
+              >
+                {copy.clearChat}
+              </button>
+            </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="max-h-[46vh] space-y-4 overflow-y-auto pr-1">
             {messages.map((message) => (
-              <MessageCard key={message.id} message={message} copy={copy} />
+              <MessageCard
+                key={message.id}
+                message={message}
+                copy={copy}
+                onSpeak={speakAssistantMessage}
+                speakingMessageId={speakingMessageId}
+                isIndicLanguage={isIndicLanguage}
+              />
             ))}
           </div>
 
           <form
-            className="mt-5 rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.96))] p-3"
+            className="mt-5 rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.98))] p-3 shadow-sm"
             onSubmit={(event) => {
               event.preventDefault();
               askAssistant(messageInput);
@@ -852,8 +1388,39 @@ export default function App() {
               onChange={(event) => setMessageInput(event.target.value)}
               placeholder={copy.placeholder}
               rows={4}
-              className="w-full resize-none border-0 bg-transparent text-sm leading-6 text-slate-800 outline-none placeholder:text-slate-400"
+              className={`w-full resize-none border-0 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400 ${isIndicLanguage ? "leading-7 tracking-[0.01em]" : "leading-6"}`}
             />
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleVoiceInput}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                  isListening
+                    ? "border-rose-200 bg-rose-50 text-rose-700"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-clay hover:text-clay"
+                }`}
+              >
+                {isListening ? copy.stopListening : copy.voiceInput}
+              </button>
+              {isListening ? (
+                <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                  <PulseDots />
+                  <span>{copy.listening}</span>
+                </span>
+              ) : null}
+              {!voiceSupported ? (
+                <span className="text-xs text-slate-500">{copy.voiceUnsupported}</span>
+              ) : null}
+              <label className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 md:hidden">
+                <input
+                  type="checkbox"
+                  checked={autoSpeak}
+                  onChange={(event) => setAutoSpeak(event.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600"
+                />
+                <span>Auto voice</span>
+              </label>
+            </div>
             <div className="mt-3 flex items-center justify-between gap-3">
               <div className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-500">
                 {currentHost || copy.noWebsite}
@@ -867,22 +1434,6 @@ export default function App() {
               </button>
             </div>
           </form>
-        </section>
-
-        <section className="rounded-[30px] border border-white/80 bg-white/85 p-4 shadow-panel backdrop-blur">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-            {copy.settings}
-          </p>
-          <label className="mt-3 block text-sm text-slate-700" htmlFor="backend-url">
-            Backend URL
-          </label>
-          <input
-            id="backend-url"
-            type="url"
-            value={backendUrl}
-            onChange={(event) => setBackendUrl(event.target.value)}
-            className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none ring-clay/30 transition focus:ring"
-          />
         </section>
       </div>
     </div>

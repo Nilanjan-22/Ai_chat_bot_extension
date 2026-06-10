@@ -125,15 +125,73 @@ async function readPageContext(urlString, tabId) {
   }
 }
 
+let voiceWindowId = null;
+
+async function openVoicePopup(language) {
+  // Close existing popup if any.
+  if (voiceWindowId != null) {
+    try {
+      await chrome.windows.remove(voiceWindowId);
+    } catch {}
+    voiceWindowId = null;
+  }
+
+  const voiceUrl = chrome.runtime.getURL(`voice.html?lang=${encodeURIComponent(language)}`);
+
+  const popup = await chrome.windows.create({
+    url: voiceUrl,
+    type: "popup",
+    width: 380,
+    height: 280,
+    focused: true
+  });
+
+  voiceWindowId = popup.id;
+
+  // Track when the popup window is closed.
+  const onRemoved = (windowId) => {
+    if (windowId === voiceWindowId) {
+      voiceWindowId = null;
+      chrome.windows.onRemoved.removeListener(onRemoved);
+    }
+  };
+
+  chrome.windows.onRemoved.addListener(onRemoved);
+}
+
+async function closeVoicePopup() {
+  if (voiceWindowId != null) {
+    try {
+      await chrome.windows.remove(voiceWindowId);
+    } catch {}
+    voiceWindowId = null;
+  }
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   if (chrome.sidePanel?.setPanelBehavior) {
     chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
   }
 });
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  const type = message?.type;
+
+  // Ignore message types this listener doesn't own.
+  const handled = [
+    "GET_ACTIVE_TAB",
+    "REQUEST_SITE_ACCESS",
+    "GET_PAGE_CONTEXT",
+    "START_VOICE_RECOGNITION",
+    "STOP_VOICE_RECOGNITION"
+  ];
+
+  if (!handled.includes(type)) {
+    return false;
+  }
+
   (async () => {
-    switch (message?.type) {
+    switch (type) {
       case "GET_ACTIVE_TAB": {
         const tab = await getActiveTab();
         sendResponse({
@@ -152,11 +210,23 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse(result);
         break;
       }
-      default:
-        sendResponse({
-          ok: false,
-          error: "Unknown background request."
-        });
+      case "START_VOICE_RECOGNITION": {
+        try {
+          await openVoicePopup(message.language || "en");
+          sendResponse({ ok: true });
+        } catch (err) {
+          sendResponse({
+            ok: false,
+            error: err instanceof Error ? err.message : "Could not open voice input."
+          });
+        }
+        break;
+      }
+      case "STOP_VOICE_RECOGNITION": {
+        await closeVoicePopup();
+        sendResponse({ ok: true });
+        break;
+      }
     }
   })();
 

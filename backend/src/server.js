@@ -3,6 +3,7 @@ import cors from "cors";
 import express from "express";
 import { generateAssistantAnswer } from "./lib/ai.js";
 import { findGuideForUrl, loadSiteGuides } from "./lib/siteGuides.js";
+import { generateSpeechAudio } from "./lib/tts.js";
 
 const app = express();
 const port = Number(process.env.PORT || 8787);
@@ -68,6 +69,26 @@ app.post("/api/chat", async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: error instanceof Error ? error.message : "Unknown server error"
+    });
+  }
+});
+
+app.post("/api/tts", async (req, res) => {
+  const { text, language = "en" } = req.body ?? {};
+
+  try {
+    const audio = await generateSpeechAudio({
+      text,
+      language
+    });
+
+    res.setHeader("Content-Type", "audio/mpeg");
+    res.setHeader("Cache-Control", "no-store");
+    return res.send(audio);
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      ok: false,
+      error: error instanceof Error ? error.message : "Unknown TTS error"
     });
   }
 });

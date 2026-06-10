@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Disha – Listening</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        width: 340px;
+        min-height: 200px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: linear-gradient(135deg, #fffdf7, #f6efe2);
+        color: #1e293b;
+        padding: 24px;
+      }
+      .container { text-align: center; width: 100%; }
+      .pulse-ring {
+        width: 80px; height: 80px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #14532d, #2a7a58);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 16px;
+        animation: pulse 1.5s ease-in-out infinite;
+        font-size: 32px;
+      }
+      @keyframes pulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(20, 83, 45, 0.4); }
+        50% { box-shadow: 0 0 0 16px rgba(20, 83, 45, 0); }
+      }
+      h2 { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+      #transcript {
+        font-size: 14px;
+        color: #475569;
+        min-height: 40px;
+        line-height: 1.6;
+        margin-bottom: 16px;
+        font-style: italic;
+      }
+      #status { font-size: 12px; color: #94a3b8; }
+      .error { color: #dc2626 !important; font-style: normal !important; }
+      #stop-btn {
+        display: inline-block;
+        padding: 8px 24px;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        background: white;
+        color: #1e293b;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        margin-top: 8px;
+      }
+      #stop-btn:hover { border-color: #dc2626; color: #dc2626; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="pulse-ring">🎤</div>
+      <h2>Listening...</h2>
+      <div id="transcript">Speak now</div>
+      <button id="stop-btn">Stop</button>
+      <div id="status"></div>
+    </div>
+    <script src="./voice.js"></script>
+  </body>
+</html>
